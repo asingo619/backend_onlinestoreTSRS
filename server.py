@@ -2,7 +2,7 @@ from mock_data import mock_data
 import json
 from flask import Flask, render_template, abort, request
 from flask_cors import CORS
-from config import db
+from config import db, parse_json
 
 app = Flask(__name__)
 CORS(app)
@@ -46,14 +46,17 @@ def address_info():
 @app.route("/api/catalog", methods=["GET"])
 def get_catalog():
     # read products from database and return it
-    cursor = db.products.find({}) # get all records/documents in not specified
+    cursor = db.products.find({}) # get all records/documents (if not specified)
     catalog = []
     for prod in cursor:
         catalog.append(prod)
     
-    return json.dumps(mock_data)
-    # return "OK"
+    # list comprehensions
+    # catalog = [prod for prod in cursor]
     
+    return parse_json(mock_data)
+    
+    # return "OK"
     # print(request.headers)
     
 
@@ -67,14 +70,21 @@ def save_product():
     if not "title" in product or len(product["title"]) < 5:
         abort(400, "Title is required and should be at least 5 chars long")
 
+        # save product into the DB
+        # MONGODB add a _id with a unique value
+        db.product.insert_one(product)
+        return parse_json(product)
+
     mock_data.append(product)
     product["_id"] = len(product["title"])
-    return json.dumps(product)   
+    return parse_json(product)   
 
 
 @app.route("/api/categories")
 def get_categories():
-    
+    # return a list with the uique categories [string, string]
+
+    cursor = db.products.find({})
     categories = []
     for product in mock_data:
         cat = product["category"]
@@ -82,39 +92,51 @@ def get_categories():
         if cat not in categories:
             categories.append(cat)
     
-    return json.dumps(categories)
+    return parse_json(categories)
 
 @app.route("/api/product/<id>")
 def get_by_id(id):
     # find the porduct with such id
     # return the product as json string
-    found = False
-    for prod in mock_data:
-        if prod["_id"] == id:
-            found = True
-            return json.dumps(prod)
+    
+    # found = False
+    # for prod in mock_data:
+    #     if prod["_id"] == id:
+    #         found = True
+    #         return parse_json(prod)
 
+    product = db.products.find_one({"_id": id})
     if not found:       
         abort(404)
+
+    return parse_json(product)    
 
 
 @app.route("/api/catalog/<cat>")
 def get_by_category(cat):
+
+    cursor = db.products.find({"category": cat})  
     prods = []
-    for prod in mock_data:
-        if prod["category"].lower() == cat.lower():
-            prods.append(prod)
-        
-    return json.dumps(prod)
+    for prod in cursor:
+        prods.append(prod)
+
+    # prods = []
+    # for prod in mock_data:
+    #     if prod["category"].lower() == cat.lower():
+    #         prods.append(prod)
+  
+    return parse_json(prods)
 
 @app.route("/api/cheapest") 
 def get_cheapest():
-    cheapest = mock_data[0]
-    for prod in mock_data:
+
+    cursor = db.products.find({})
+    cheapest = cursor[0]
+    for prod in cursor:
         if prod ["price"] < cheapest["price"]:
             cheapest = prod
 
-    return json.dumps(cheapest)   
+    return parse_json(cheapest)   
 
 
 @app.route("/api/test/loadData")
